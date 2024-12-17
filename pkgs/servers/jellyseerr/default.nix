@@ -1,84 +1,76 @@
 {
   lib,
-  mkYarnPackage,
   fetchFromGitHub,
-  fetchYarnDeps,
   makeWrapper,
   node-pre-gyp,
   nodejs,
+  pnpm_9,
   python3,
-  sqlite,
+  stdenv,
 }:
 
-mkYarnPackage rec {
+stdenv.mkDerivation (finalAttrs: {
   pname = "jellyseerr";
-  version = "1.9.2";
+  version = "2.1.0";
 
-  src = fetchFromGitHub {
-    owner = "Fallenbagel";
-    repo = "jellyseerr";
-    rev = "v${version}";
-    hash = "sha256-TXe/k/pb7idu7G1wGu6TZksnoFQ5/PN0voVlve3k1UI=";
-  };
-
-  packageJSON = ./package.json;
-
-  offlineCache = fetchYarnDeps {
-    yarnLock = "${src}/yarn.lock";
-    hash = "sha256-2iRxguxEI+YKm8ddhRgZMvfZuUgQmCK5ER4jMCFJQMQ=";
-  };
+  src =
+    with finalAttrs;
+    fetchFromGitHub {
+      owner = "Fallenbagel";
+      repo = "jellyseerr";
+      rev = "v${version}";
+      hash = "sha256-5kaeqhjUy9Lgx4/uFcGRlAo+ROEOdTWc2m49rq8R8Hs=";
+    };
 
   nativeBuildInputs = [
     nodejs
     makeWrapper
+    pnpm_9.configHook
+
+    # Needed for compiling sqlite3 and bcrypt from source
+    node-pre-gyp
+    python3
   ];
 
-  # Fixes "SQLite package has not been found installed" at launch
-  pkgConfig.sqlite3 = {
-    nativeBuildInputs = [
-      node-pre-gyp
-      python3
-      sqlite
-    ];
-    postInstall = ''
-      export CPPFLAGS="-I${nodejs}/include/node"
-      node-pre-gyp install --prefer-offline --build-from-source --nodedir=${nodejs}/include/node --sqlite=${sqlite.dev}
-      rm -r build-tmp-napi-v6
-    '';
-  };
-
-  pkgConfig.bcrypt = {
-    nativeBuildInputs = [
-      node-pre-gyp
-      python3
-    ];
-    postInstall = ''
-      export CPPFLAGS="-I${nodejs}/include/node"
-      node-pre-gyp install --prefer-offline --build-from-source --nodedir=${nodejs}/include/node
-    '';
+  pnpmDeps = pnpm_9.fetchDeps {
+    inherit (finalAttrs) pname version src;
+    hash = "sha256-xu6DeaBArQmnqEnIgjc1DTZujQebSkjuai9tMHeQWCk=";
   };
 
   buildPhase = ''
     runHook preBuild
-    (
-      shopt -s dotglob
-      cd deps/jellyseerr
-      rm -r config/*
-      yarn build
-      rm -r .next/cache
-    )
+    pnpm build
+
+    # Fixes "SQLite package has not been found installed" at launch
+    pushd node_modules/sqlite3
+    export CPPFLAGS="-I${nodejs}/include/node"
+    npm run install --build-from-source --nodedir=${nodejs}/include/node
+    popd
+
+    pushd node_modules/bcrypt
+    export CPPFLAGS="-I${nodejs}/include/node"
+    npm run install --build-from-source --nodedir=${nodejs}/include/node
+    popd
+
     runHook postBuild
+  '';
+
+  preInstall = ''
+    mkdir $out
+    cp ./package.json $out
+    rm -r .next/cache
+    cp -R ./.next $out
+    cp -R ./dist $out
+    cp ./overseerr-api.yml $out
+    cp -R ./node_modules $out
   '';
 
   postInstall = ''
     makeWrapper '${nodejs}/bin/node' "$out/bin/jellyseerr" \
-      --add-flags "$out/libexec/jellyseerr/deps/jellyseerr/dist/index.js" \
+      --chdir $out \
+      --add-flags "$out/dist/index.js" \
       --set NODE_ENV production
   '';
-
-  doDist = false;
-
-  passthru.updateScript = ./update.sh;
 
   meta = with lib; {
     description = "Fork of overseerr for jellyfin support";
@@ -89,8 +81,11 @@ mkYarnPackage rec {
       bring support for Jellyfin & Emby media servers!
     '';
     license = licenses.mit;
-    maintainers = with maintainers; [ camillemndn ];
+    maintainers = with maintainers; [
+      camillemndn
+      pizzapim
+    ];
     platforms = platforms.linux;
     mainProgram = "jellyseerr";
   };
-}
+})
