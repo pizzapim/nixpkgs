@@ -1,9 +1,17 @@
-{ config, pkgs, lib, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}:
 let
   cfg = config.services.jellyseerr;
 in
 {
-  meta.maintainers = [ lib.maintainers.camillemndn ];
+  meta.maintainers = with lib.maintainers; [
+    camillemndn
+    pizzapim
+  ];
 
   options.services.jellyseerr = {
     enable = lib.mkEnableOption ''Jellyseerr, a requests manager for Jellyfin'';
@@ -27,14 +35,17 @@ in
       description = "Jellyseerr, a requests manager for Jellyfin";
       after = [ "network.target" ];
       wantedBy = [ "multi-user.target" ];
-      environment.PORT = toString cfg.port;
+
+      environment = {
+        PORT = toString cfg.port;
+        CONFIG_DIRECTORY = "/var/lib/jellyseerr";
+      };
+
       serviceConfig = {
         Type = "exec";
         StateDirectory = "jellyseerr";
-        WorkingDirectory = "${cfg.package}/libexec/jellyseerr/deps/jellyseerr";
         DynamicUser = true;
         ExecStart = lib.getExe cfg.package;
-        BindPaths = [ "/var/lib/jellyseerr/:${cfg.package}/libexec/jellyseerr/deps/jellyseerr/config/" ];
         Restart = "on-failure";
         ProtectHome = true;
         ProtectSystem = "strict";
