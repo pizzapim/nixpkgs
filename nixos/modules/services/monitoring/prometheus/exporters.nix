@@ -574,6 +574,8 @@ in
         system.activationScripts = {
           deluge-exported.text = ''
             mkdir -p /etc/deluge-exporter
+          ''
+          + lib.optionalString (config.services.prometheus.exporters.deluge.delugePasswordFile != null) ''
             echo "DELUGE_PASSWORD=$(cat ${config.services.prometheus.exporters.deluge.delugePasswordFile})" > /etc/deluge-exporter/password
           '';
         };
