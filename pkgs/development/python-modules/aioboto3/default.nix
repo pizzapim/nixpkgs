@@ -3,28 +3,23 @@
   stdenv,
   buildPythonPackage,
   fetchFromGitHub,
-
   # build-system
   setuptools,
   setuptools-scm,
-
   # dependencies
   aiobotocore,
   aiofiles,
-
   # optional-dependencies
   # chalice
   chalice,
   # s3cse
   cryptography,
-
   # tests
   dill,
   moto,
   pytest-asyncio,
   pytestCheckHook,
 }:
-
 buildPythonPackage (finalAttrs: {
   pname = "aioboto3";
   version = "15.5.0";
@@ -46,44 +41,57 @@ buildPythonPackage (finalAttrs: {
     setuptools-scm
   ];
 
-  dependencies = [
-    aiobotocore
-    aiofiles
-  ]
-  ++ aiobotocore.optional-dependencies.boto3;
+  dependencies =
+    [
+      aiobotocore
+      aiofiles
+    ]
+    ++ aiobotocore.optional-dependencies.boto3;
 
   optional-dependencies = {
-    chalice = [ chalice ];
-    s3cse = [ cryptography ];
+    chalice = [chalice];
+    s3cse = [cryptography];
   };
 
-  nativeCheckInputs = [
-    dill
-    moto
-    pytest-asyncio
-    pytestCheckHook
-  ]
-  ++ moto.optional-dependencies.server
-  ++ lib.concatAttrValues finalAttrs.passthru.optional-dependencies;
+  nativeCheckInputs =
+    [
+      dill
+      moto
+      pytest-asyncio
+      pytestCheckHook
+    ]
+    ++ moto.optional-dependencies.server
+    ++ lib.concatAttrValues finalAttrs.passthru.optional-dependencies;
 
-  disabledTests = [
-    "test_patches"
-  ]
-  ++ lib.optionals stdenv.hostPlatform.isDarwin [
-    # Flaky: PermissionError: [Errno 13] Permission denied: '/tmp/somefile'
-    "test_s3_copy"
-    "test_s3_copy_multipart"
-    "test_s3_download_file_404"
-    "test_s3_upload_file"
-  ];
+  disabledTests =
+    [
+      "test_patches"
 
-  pythonImportsCheck = [ "aioboto3" ];
+      # Flakey tests
+      # botocore.exceptions.HTTPClientError: An HTTP Client raised an unhandled exception: 400, message="Duplicate 'Server' header found.", url='http://localhost:5001/'
+      "test_dynamo_resource_query"
+      "test_dynamo_resource_put"
+      "test_dynamo_resource_batch_write_flush_on_exit_context"
+      "test_dynamo_resource_batch_write_flush_amount"
+      "test_flush_doesnt_reset_item_buffer"
+      "test_dynamo_resource_property"
+      "test_dynamo_resource_waiter"
+    ]
+    ++ lib.optionals stdenv.hostPlatform.isDarwin [
+      # Flaky: PermissionError: [Errno 13] Permission denied: '/tmp/somefile'
+      "test_s3_copy"
+      "test_s3_copy_multipart"
+      "test_s3_download_file_404"
+      "test_s3_upload_file"
+    ];
+
+  pythonImportsCheck = ["aioboto3"];
 
   meta = {
     description = "Wrapper to use boto3 resources with the aiobotocore async backend";
     homepage = "https://github.com/terricain/aioboto3";
     changelog = "https://github.com/terricain/aioboto3/blob/${finalAttrs.src.tag}/CHANGELOG.rst";
     license = lib.licenses.asl20;
-    maintainers = [ ];
+    maintainers = [];
   };
 })
